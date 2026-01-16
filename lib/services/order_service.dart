@@ -1,46 +1,31 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../config/api_config.dart';
-import '../models/order.dart';
+import 'package:point_of_sales_flutter/models/order.dart';
 
 class OrderService {
-  // Create Order (Checkout)
-  Future<void> createOrder({
-    required String token,
-    required Order order,
-  }) async {
+  // Ganti dengan IP laptop jika pakai emulator (10.0.2.2) atau IP Server
+  final String baseUrl = "http://10.0.2.2:8080/api/orders";
+
+  Future<Map<String, dynamic>> submitOrder(OrderRequest order, String token) async {
     try {
       final response = await http.post(
-        Uri.parse('${ApiConfig.orderServiceUrl}/api/orders'),
-        headers: ApiConfig.headers(token: token),
+        Uri.parse(baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
         body: jsonEncode(order.toJson()),
       );
 
-      if (response.statusCode != 200) {
-        final error = jsonDecode(response.body);
-        throw Exception(error['error'] ?? 'Gagal menyimpan transaksi');
-      }
-    } catch (e) {
-      throw Exception('Tidak dapat terhubung ke server: $e');
-    }
-  }
-
-  // Get All Orders
-  Future<List<Order>> getAllOrders(String token) async {
-    try {
-      final response = await http.get(
-        Uri.parse('${ApiConfig.orderServiceUrl}/api/orders'),
-        headers: ApiConfig.headers(token: token),
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((json) => Order.fromJson(json)).toList();
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return data; // Berhasil
       } else {
-        throw Exception('Gagal mengambil data transaksi');
+        return {'error': data['error'] ?? 'Gagal membuat pesanan'};
       }
     } catch (e) {
-      throw Exception('Tidak dapat terhubung ke server: $e');
+      return {'error': 'Koneksi gagal: $e'};
     }
   }
 }

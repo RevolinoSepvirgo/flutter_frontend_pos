@@ -1,142 +1,125 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/order.dart';
-import '../models/product.dart';
-import '../services/order_service.dart';
-import '../services/report_service.dart';
-import 'auth_provider.dart';
-import 'report_provider.dart';
+import 'package:http/http.dart' as http;
+import 'auth_provider.dart'; // Untuk ambil token JWT
 
+// 1. MODEL ITEM KERANJANG
+class CartItem {
+  final String productId;
+  final String productName;
+  final double price;
+  int quantity;
+
+  CartItem({
+    required this.productId,
+    required this.productName,
+    required this.price,
+    this.quantity = 1,
+  });
+
+  // Sesuaikan dengan Map di Java (id_produk, nama_produk, harga, qty)
+  Map<String, dynamic> toJson() {
+    return {
+      'id_produk': productId,
+      'nama_produk': productName,
+      'harga': price,
+      'qty': quantity,
+      'total': price * quantity,
+    };
+  }
+}
+
+// 2. STATE UNTUK RIVERPOD
 class CartState {
   final List<CartItem> items;
+  CartState({this.items = const []});
 
-  const CartState({this.items = const []});
-
-  double get total => items.fold(0, (sum, item) => sum + item.subtotal);
-  int get itemCount => items.fold(0, (sum, item) => sum + item.quantity);
-
-  CartState copyWith({List<CartItem>? items}) {
-    return CartState(items: items ?? this.items);
-  }
+  double get total => items.fold(0, (sum, item) => sum + (item.price * item.quantity));
 }
 
-class CartNotifier extends StateNotifier<CartState> {
-  final Ref ref;
-  final OrderService _orderService = OrderService();
-  final ReportService _reportService = ReportService();
-
-  CartNotifier(this.ref) : super(const CartState());
-
-  void addToCart(Product product) {
-    final index =
-        state.items.indexWhere((item) => item.productId == product.id);
-
-    if (index >= 0) {
-      final updated = [...state.items];
-      final existing = updated[index];
-
-      if (existing.quantity < product.stock) {
-        updated[index] =
-            existing.copyWith(quantity: existing.quantity + 1);
-        state = state.copyWith(items: updated);
-      }
-    } else {
-      if (product.stock > 0) {
-        state = state.copyWith(
-          items: [
-            ...state.items,
-            CartItem(
-              productId: product.id,
-              productName: product.productName,
-              price: product.price,
-              quantity: 1,
-              stock: product.stock,
-            ),
-          ],
-        );
-      }
-    }
-  }
-
-  void increaseQuantity(int productId) {
-    state = state.copyWith(
-      items: state.items.map((item) {
-        if (item.productId == productId && item.canAddMore) {
-          return item.copyWith(quantity: item.quantity + 1);
-        }
-        return item;
-      }).toList(),
-    );
-  }
-
-  void decreaseQuantity(int productId) {
-    final updated = <CartItem>[];
-
-    for (final item in state.items) {
-      if (item.productId == productId) {
-        if (item.quantity > 1) {
-          updated.add(item.copyWith(quantity: item.quantity - 1));
-        }
-      } else {
-        updated.add(item);
-      }
-    }
-
-    state = state.copyWith(items: updated);
-  }
-
-  void clearCart() {
-    state = const CartState();
-  }
-
-  Future<void> checkout(String paymentMethod, {double? cashAmount}) async {
-    if (state.items.isEmpty) {
-      throw Exception('Keranjang kosong');
-    }
-
-    final authState = ref.read(authProvider);
-    final token = authState.token;
-    final storeName = authState.user?.storeName;
-
-    if (token == null || storeName == null) {
-      throw Exception('Sesi login tidak valid');
-    }
-
-    try {
-      final orderItems = state.items.map((item) {
-        return OrderItem(
-          idProduk: item.productId.toString(),
-          namaProduk: item.productName,
-          qty: item.quantity,
-          harga: item.price,
-          total: item.subtotal,
-        );
-      }).toList();
-
-      final order = Order(
-        namaToko: storeName,
-        items: orderItems,
-        subtotal: state.total,
-        totalHarga: state.total,
-        metodePembayaran: paymentMethod,
-        bayar: cashAmount,
-        createdAt: DateTime.now(),
-      );
-
-      // ✅ 1️⃣ Create order
-      await _orderService.createOrder(token: token, order: order);
-
-      // ✅ 2️⃣ Refresh report dashboard UI
-      ref.read(reportProvider.notifier).loadDashboard();
-
-      // ✅ 3️⃣ Clear cart
-      state = const CartState();
-    } catch (e) {
-      throw Exception('Checkout gagal: $e');
-    }
-  }
-}
-
-final cartProvider =
-    StateNotifierProvider<CartNotifier, CartState>((ref) {
+// 3. PROVIDER GLOBAL (HURUF KECIL)
+final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
   return CartNotifier(ref);
 });
+
+// 4. LOGIKA KERANJANG & CHECKOUT
+class CartNotifier extends StateNotifier<CartState> {
+  final Ref ref;
+  CartNotifier(this.ref) : super(CartState());
+
+  void addToCart(dynamic product) {
+    // Pastikan 'product.id' sesuai dengan field di Product model Anda
+    final productId = product.id.toString();
+    final existingIndex = state.items.indexWhere((item) => item.productId == productId);
+    
+    if (existingIndex >= 0) {
+      state.items[existingIndex].quantity++;
+      state = CartState(items: [...state.items]);
+    } else {
+      state = CartState(items: [
+        ...state.items,
+        CartItem(
+          productId: productId,
+          productName: product.productName,
+          price: product.price.toDouble(),
+        )
+      ]);
+    }
+  }
+
+  void increaseQuantity(String id) {
+    state = CartState(items: [
+      for (final item in state.items)
+        if (item.productId == id)
+          CartItem(productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity + 1)
+        else
+          item
+    ]);
+  }
+
+  void decreaseQuantity(String id) {
+    final List<CartItem> newList = [];
+    for (final item in state.items) {
+      if (item.productId == id) {
+        if (item.quantity > 1) {
+          newList.add(CartItem(productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity - 1));
+        }
+      } else {
+        newList.add(item);
+      }
+    }
+    state = CartState(items: newList);
+  }
+
+  void clearCart() => state = CartState(items: []);
+
+  // FUNGSI SIMPAN KE DATABASE (BACKEND SPRING BOOT)
+  Future<void> checkout(String method, {double? bayar}) async {
+    final token = ref.read(authProvider).token; 
+    // Ganti 10.0.2.2 dengan IP laptop Anda jika pakai HP fisik
+    final url = Uri.parse("http://10.0.2.2:8080/api/orders"); 
+
+    final body = {
+      "items": state.items.map((e) => e.toJson()).toList(),
+      "metodePembayaran": method == "cash" ? "Tunai" : "QRIS",
+      "bayar": method == "cash" ? (bayar ?? state.total) : state.total,
+    };
+
+    final response = await http.post(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      clearCart();
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw errorData['error'] ?? "Gagal menyimpan transaksi";
+    }
+  }
+}

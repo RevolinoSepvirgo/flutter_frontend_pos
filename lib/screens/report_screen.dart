@@ -97,7 +97,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
         children: [
           _buildSummarySection(report.summaryHariIni),
           const SizedBox(height: 35),
-          _buildSectionTitle('METODE PEMBAYARAN'),
+          _buildSectionTitle('Pemasukan Berdasarkan Metode Pembayaran'),
           const SizedBox(height: 15),
           _buildPaymentMethodStats(report.metodePermbayaran),
           const SizedBox(height: 35),

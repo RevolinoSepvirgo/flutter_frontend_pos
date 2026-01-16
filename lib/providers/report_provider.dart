@@ -69,6 +69,8 @@ class ReportNotifier extends StateNotifier<ReportState> {
   void clearError() {
     state = state.copyWith(error: null);
   }
+
+  void fetchReport() {}
 }
 
 // Provider
