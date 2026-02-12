@@ -1,31 +1,46 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:point_of_sales_flutter/models/order.dart';
+import '../config/api_config.dart';
+import '../models/order.dart';
 
 class OrderService {
-  // Ganti dengan IP laptop jika pakai emulator (10.0.2.2) atau IP Server
-  final String baseUrl = "http://10.0.2.2:8080/api/orders";
-
-  Future<Map<String, dynamic>> submitOrder(OrderRequest order, String token) async {
+  // Create Order (Checkout)
+  Future<void> createOrder({
+    required String token,
+    required OrderRequest order,
+  }) async {
     try {
       final response = await http.post(
-        Uri.parse(baseUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+        Uri.parse('${ApiConfig.orderServiceUrl}/api/orders'),
+        headers: ApiConfig.headers(token: token),
         body: jsonEncode(order.toJson()),
       );
 
-      final data = jsonDecode(response.body);
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return data; // Berhasil
-      } else {
-        return {'error': data['error'] ?? 'Gagal membuat pesanan'};
+      if (response.statusCode != 200) {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Gagal menyimpan transaksi');
       }
     } catch (e) {
-      return {'error': 'Koneksi gagal: $e'};
+      throw Exception('Tidak dapat terhubung ke server: $e');
+    }
+  }
+
+  // Get All Orders
+  Future<List<Order>> getAllOrders(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.orderServiceUrl}/api/orders'),
+        headers: ApiConfig.headers(token: token),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => Order.fromJson(json)).toList();
+      } else {
+        throw Exception('Gagal mengambil data transaksi');
+      }
+    } catch (e) {
+      throw Exception('Tidak dapat terhubung ke server: $e');
     }
   }
 }

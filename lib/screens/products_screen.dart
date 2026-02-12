@@ -47,7 +47,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 
     return Scaffold(
       backgroundColor: colorMilkWhite,
-      // Hapus FAB dari sini karena dipindah ke Header agar tidak tertutup dock
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -67,7 +66,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       style: TextStyle(color: colorDeepSage, fontSize: 28, fontWeight: FontWeight.w900)),
                   ],
                 ),
-                // TOMBOL TAMBAH DI SINI (Lebih Pro & Tidak Tertutup)
                 GestureDetector(
                   onTap: () => _showProductForm(),
                   child: Container(
@@ -120,7 +118,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 : filteredProducts.isEmpty
                     ? _buildEmptyState()
                     : ListView.builder(
-                        // PENTING: Beri padding bawah yang besar (120-150) agar item terakhir tidak tertutup dock navigasi
                         padding: const EdgeInsets.fromLTRB(25, 0, 25, 130), 
                         itemCount: filteredProducts.length,
                         itemBuilder: (context, index) {
@@ -147,6 +144,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
+            // BAGIAN IKON (PENGGANTI GAMBAR)
             Container(
               width: 85,
               height: 85,
@@ -154,12 +152,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 color: colorDeepSage.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: product.imageUrl != null && product.imageUrl!.isNotEmpty
-                    ? Image.network(product.imageUrl!, fit: BoxFit.cover, 
-                        errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_rounded, color: colorDeepSage))
-                    : const Icon(Icons.inventory_2_rounded, color: colorDeepSage, size: 30),
+              child: const Center(
+                child: Icon(
+                  Icons.restaurant_menu_rounded, // Ikon menu tetap yang elegan
+                  color: colorDeepSage,
+                  size: 35,
+                ),
               ),
             ),
             const SizedBox(width: 15),
@@ -187,7 +185,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    'Stok: ${product.stock}',
+                    'St: ${product.stock}',
                     style: TextStyle(color: lowStock ? Colors.red : colorDeepSage, fontWeight: FontWeight.bold, fontSize: 11),
                   ),
                 ),
@@ -255,10 +253,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   }
 }
 
-// ... Form Dialog Tetap Sama Seperti Sebelumnya ...
-
 // ---------------------------------------------------------
-// FORM DIALOG MENGGUNAKAN BOTTOM SHEET AGAR LEBIH KREATIF
+// FORM DIALOG TANPA INPUT GAMBAR
 // ---------------------------------------------------------
 class _ProductFormDialog extends ConsumerStatefulWidget {
   final dynamic product;
@@ -273,7 +269,6 @@ class _ProductFormDialogState extends ConsumerState<_ProductFormDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _priceController;
   late final TextEditingController _stockController;
-  late final TextEditingController _imageUrlController;
   int? _selectedCategoryId;
   bool _isLoading = false;
 
@@ -283,9 +278,7 @@ class _ProductFormDialogState extends ConsumerState<_ProductFormDialog> {
     _nameController = TextEditingController(text: widget.product?.productName ?? '');
     _priceController = TextEditingController(text: widget.product?.price.toString() ?? '');
     _stockController = TextEditingController(text: widget.product?.stock.toString() ?? '');
-    _imageUrlController = TextEditingController(text: widget.product?.imageUrl ?? '');
     _selectedCategoryId = widget.product?.categoryId;
-    _imageUrlController.addListener(() => setState(() {}));
   }
 
   @override
@@ -293,7 +286,6 @@ class _ProductFormDialogState extends ConsumerState<_ProductFormDialog> {
     _nameController.dispose();
     _priceController.dispose();
     _stockController.dispose();
-    _imageUrlController.dispose();
     super.dispose();
   }
 
@@ -317,6 +309,17 @@ class _ProductFormDialogState extends ConsumerState<_ProductFormDialog> {
             children: [
               Center(child: Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)))),
               const SizedBox(height: 20),
+              
+              // IKON PREVIEW DI FORM
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(color: colorDeepSage.withOpacity(0.1), shape: BoxShape.circle),
+                  child: const Icon(Icons.restaurant_menu_rounded, color: colorDeepSage, size: 40),
+                ),
+              ),
+              const SizedBox(height: 25),
+              
               Text(widget.product == null ? 'Tambah Produk Baru' : 'Perbarui Produk', 
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: colorDeepSage)),
               const SizedBox(height: 25),
@@ -329,6 +332,7 @@ class _ProductFormDialogState extends ConsumerState<_ProductFormDialog> {
                 decoration: _inputDecoration("Kategori", Icons.category_outlined),
                 items: categories.map((cat) => DropdownMenuItem(value: cat.id, child: Text(cat.categoryName))).toList(),
                 onChanged: (v) => setState(() => _selectedCategoryId = v),
+                validator: (v) => v == null ? 'Pilih kategori' : null,
               ),
               const SizedBox(height: 15),
               
@@ -339,31 +343,22 @@ class _ProductFormDialogState extends ConsumerState<_ProductFormDialog> {
                   Expanded(child: _customInput("Stok", _stockController, Icons.inventory_2_outlined, isNumber: true)),
                 ],
               ),
-              const SizedBox(height: 15),
               
-              _customInput("URL Gambar", _imageUrlController, Icons.link_rounded),
-              
-              if (_imageUrlController.text.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                Center(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
-                    child: Image.network(_imageUrlController.text, height: 120, width: double.infinity, fit: BoxFit.cover,
-                      errorBuilder: (_,__,___) => const SizedBox()),
-                  ),
-                )
-              ],
-              
-              const SizedBox(height: 30),
+              const SizedBox(height: 35),
               SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _submit,
-                  style: ElevatedButton.styleFrom(backgroundColor: colorDeepSage, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorDeepSage, 
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    elevation: 0,
+                  ),
                   child: _isLoading 
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : Text(widget.product == null ? 'Simpan Produk' : 'Simpan Perubahan', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    : Text(widget.product == null ? 'Simpan Produk' : 'Simpan Perubahan', 
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
                 ),
               ),
             ],
@@ -390,6 +385,10 @@ class _ProductFormDialogState extends ConsumerState<_ProductFormDialog> {
       filled: true,
       fillColor: Colors.white,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: const BorderSide(color: colorDeepSage, width: 1.5),
+      ),
     );
   }
 
@@ -404,7 +403,6 @@ class _ProductFormDialogState extends ConsumerState<_ProductFormDialog> {
           productName: _nameController.text,
           price: double.parse(_priceController.text),
           stock: int.parse(_stockController.text),
-          imageUrl: _imageUrlController.text.trim(),
         );
       } else {
         await ref.read(productProvider.notifier).updateProduct(
@@ -413,12 +411,11 @@ class _ProductFormDialogState extends ConsumerState<_ProductFormDialog> {
           productName: _nameController.text,
           price: double.parse(_priceController.text),
           stock: int.parse(_stockController.text),
-          imageUrl: _imageUrlController.text.trim(),
         );
       }
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 }

@@ -1,47 +1,60 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:point_of_sales_flutter/screens/register.dart';
 import '../providers/auth_provider.dart';
 
-import 'dashboard_screen.dart'; // Import halaman utama setelah login
-
-// Palette Warna (Konsisten)
+// Palette Warna (Konsisten dengan POS & Dashboard)
 const Color colorMilkWhite = Color(0xFFFDFBF0);
 const Color colorDeepSage = Color(0xFF465940);
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends ConsumerStatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  
+  // Controller sesuai dengan kebutuhan AuthService
+  final _usernameController = TextEditingController();
+  final _storeController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
   bool _obscurePassword = true;
 
   @override
   void dispose() {
+    _usernameController.dispose();
+    _storeController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
     try {
-      await ref.read(authProvider.notifier).login(
-            _emailController.text.trim(),
-            _passwordController.text.trim(),
+      await ref.read(authProvider.notifier).register(
+            username: _usernameController.text.trim(),
+            storeName: _storeController.text.trim(),
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
           );
       
-      // Jika berhasil login, biasanya navigasi diatur secara otomatis oleh 
-      // main.dart yang memantau authProvider, tapi jika ingin manual:
-      // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DashboardScreen()));
-      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Registrasi Berhasil! Silakan Login"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context); // Kembali ke halaman Login
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -63,61 +76,81 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 30),
+            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
             child: Form(
               key: _formKey,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo / Icon
-                  const Icon(Icons.lock_person_rounded, size: 90, color: colorDeepSage),
-                  const SizedBox(height: 15),
+                  // Logo / Header
+                  const Icon(Icons.store_mall_directory_rounded, size: 80, color: colorDeepSage),
+                  const SizedBox(height: 10),
                   const Text(
-                    "Masuk Kasir",
+                    "Daftar Toko Baru",
                     style: TextStyle(
-                      fontSize: 30, 
+                      fontSize: 28, 
                       fontWeight: FontWeight.w900, 
                       color: colorDeepSage,
-                      letterSpacing: 1.5
+                      letterSpacing: 1.2
                     ),
                   ),
-                  const Text("Silakan masuk ke akun toko Anda"),
-                  const SizedBox(height: 50),
+                  const Text("Mulai kelola bisnis Anda sekarang"),
+                  const SizedBox(height: 40),
+
+                  // Input Username
+                  _buildTextField(
+                    controller: _usernameController,
+                    label: "Username",
+                    icon: Icons.person_rounded,
+                    validator: (v) => v!.isEmpty ? "Username wajib diisi" : null,
+                  ),
+                  const SizedBox(height: 15),
+
+                  // Input Nama Toko
+                  _buildTextField(
+                    controller: _storeController,
+                    label: "Nama Toko",
+                    icon: Icons.store_rounded,
+                    validator: (v) => v!.isEmpty ? "Nama Toko wajib diisi" : null,
+                  ),
+                  const SizedBox(height: 15),
 
                   // Input Email
                   _buildTextField(
                     controller: _emailController,
-                    label: "Email / Username",
-                    icon: Icons.email_outlined,
-                    validator: (v) => v!.isEmpty ? "Email wajib diisi" : null,
+                    label: "Email",
+                    icon: Icons.email_rounded,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (v) => !v!.contains('@') ? "Format email salah" : null,
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 15),
 
                   // Input Password
                   _buildTextField(
                     controller: _passwordController,
                     label: "Password",
-                    icon: Icons.lock_outline_rounded,
+                    icon: Icons.lock_rounded,
                     isPassword: true,
-                    validator: (v) => v!.isEmpty ? "Password wajib diisi" : null,
+                    validator: (v) => v!.length < 6 ? "Password minimal 6 karakter" : null,
                   ),
-                  
-                  // Tombol Lupa Password
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {},
-                      child: const Text("Lupa Password?", style: TextStyle(color: colorDeepSage)),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 15),
 
-                  // Tombol Login
+                  // Input Konfirmasi Password
+                  _buildTextField(
+                    controller: _confirmPasswordController,
+                    label: "Konfirmasi Password",
+                    icon: Icons.lock_clock_rounded,
+                    isPassword: true,
+                    validator: (v) => v != _passwordController.text ? "Password tidak cocok" : null,
+                  ),
+                  const SizedBox(height: 30),
+
+                  // Tombol Register
                   SizedBox(
                     width: double.infinity,
                     height: 55,
                     child: ElevatedButton(
-                      onPressed: authState.isLoading ? null : _handleLogin,
+                      onPressed: authState.isLoading ? null : _handleRegister,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: colorDeepSage,
                         foregroundColor: Colors.white,
@@ -127,34 +160,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       child: authState.isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
                           : const Text(
-                              "LOGIN SEKARANG",
-                              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                              "DAFTAR SEKARANG",
+                              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
                             ),
                     ),
                   ),
 
-                  const SizedBox(height: 30),
-
-                  // --- NAVIGASI KE REGISTER ---
+                  const SizedBox(height: 20),
+                  
+                  // Link kembali ke Login
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Belum memiliki akun toko? "),
+                      const Text("Sudah punya akun? "),
                       GestureDetector(
-                        onTap: () {
-                          // Navigasi ke Halaman Register
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const RegisterScreen()),
-                          );
-                        },
+                        onTap: () => Navigator.pop(context),
                         child: const Text(
-                          "Daftar Disini",
-                          style: TextStyle(
-                            color: colorDeepSage, 
-                            fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline,
-                          ),
+                          "Login Masuk",
+                          style: TextStyle(color: colorDeepSage, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -173,11 +196,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     required String label,
     required IconData icon,
     bool isPassword = false,
+    TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: isPassword ? _obscurePassword : false,
+      keyboardType: keyboardType,
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
